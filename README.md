@@ -1,7 +1,7 @@
-# Kokoro TTS - Browser-based Text-to-Speech Application
+# Kokoro on browser - Browser-based Text-to-Speech Application
 
 ## Project Overview
-Kokoro TTS is a fully offline, local web-based text-to-speech application built using React and Vite. Powered by Kokoro.js, it downloads the speech model once and runs entirely in your browser without requiring an internet connection after initial setup. Experience fast, private text-to-speech conversion directly on your device with no ongoing data transmission.
+Kokoro on browser is a fully offline, local web-based text-to-speech application built using React and Vite. Powered by Kokoro.js, it downloads the speech model once and runs entirely in your browser without requiring an internet connection after initial setup. Experience fast, private text-to-speech conversion directly on your device with no ongoing data transmission.
 
 ## Features
 - Browser-based text-to-speech conversion
