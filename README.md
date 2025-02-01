@@ -59,3 +59,13 @@ Please read CONTRIBUTING.md for details on our code of conduct and the process f
 
 ## License
 This project is licensed under the MIT License - see the LICENSE.md file for details.
+
+## Test Audio Comparisons
+
+### Kokoro vs Piper Comparison
+
+#### GB English: Cori (Piper)
+[Piper Audio Sample](https://github.com/user-attachments/assets/54fb5142-9570-413d-9ed3-b8ff0a496d85)
+
+#### Kokoro: AF_BELLA
+[Kokoro Audio Sample](https://github.com/user-attachments/assets/3f39e4f1-9a79-4af1-b173-c8fd0ffa2381)
