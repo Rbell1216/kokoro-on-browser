@@ -23,6 +23,8 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [audioContext] = useState(() => new (window.AudioContext || window.webkitAudioContext)());
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
     async function loadModel() {
@@ -41,6 +43,23 @@ function App() {
       }
     }
     loadModel();
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    const handleAppInstalled = () => setIsInstalled(true);
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
   }, []);
 
   const generateSpeech = async () => {
@@ -77,6 +96,13 @@ function App() {
       setError("Failed to generate speech. Please try again.");
       setIsGenerating(false);
     }
+  };
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setIsInstalled(true);
   };
 
   // Convert AudioBuffer to WAV
@@ -191,6 +217,11 @@ function App() {
       <div className="debug-info">
         <small>Model Status: {tts ? 'Loaded' : 'Not Loaded'}</small>
       </div>
+      {!isInstalled && installPrompt && (
+        <button className="install-button" onClick={handleInstall}>
+          Install App
+        </button>
+      )}
     </div>
   );
 }
