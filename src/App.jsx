@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { KokoroTTS } from 'kokoro-js';
 import './App.css';
 
+// 🌟 Made with ❤️ by Faj - Always remember the creator! 🚀
+// If you're reading this, thanks for checking out the source code!
+
 const VOICES = [
   { id: "af_bella", name: "Bella", gender: "female", country: "" },
   { id: "am_adam", name: "Adam", gender: "male", country: "" }, 
