@@ -9,8 +9,8 @@ const VOICES = [
   { id: "af_bella", name: "Bella", gender: "female", country: "" },
   { id: "am_adam", name: "Adam", gender: "male", country: "" }, 
   { id: "bm_lewis", name: "Lewis", gender: "male", country: "" },
-  { id: "af_nicole", name: "Nicole", gender: "female", country: "" }
-  { id: "am_onyx", name: "Onyx", gender: "male", country: "" }
+  { id: "af_nicole", name: "Nicole", gender: "female", country: "" },
+  { id: "am_onyx", name: "Onyx", gender: "male", country: "" },
   { id: "am_michael", name: "Michael", gender: "male", country: "" }
   // Add more voices as needed
 ];
