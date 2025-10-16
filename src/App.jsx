@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { KokoroTTS } from 'kokoro-js';
-import { split } from 'sentence-splitter'; // Correctly imported
+import { split } from 'sentence-splitter';
 import './App.css';
 
 // 🌟 Made with ❤️ by Faj - Always remember the creator! 🚀
@@ -13,23 +13,20 @@ const VOICES = [
   { id: "af_nicole", name: "Nicole", gender: "female", country: "" },
   { id: "am_onyx", name: "Onyx", gender: "male", country: "" },
   { id: "am_michael", name: "Michael", gender: "male", country: "" }
-  // Add more voices as needed
 ];
 
-// ✅ CORRECT STRUCTURE: Only one "function App()" at the top level
 function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [tts, setTts] = useState(null);
   const [text, setText] = useState('');
   const [selectedVoice, setSelectedVoice] = useState(VOICES[0].id);
-  const [audioBuffer, setAudioBuffer] = useState(null);
-  const [audioUrl, setAudioUrl] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [audioContext] = useState(() => new (window.AudioContext || window.webkitAudioContext)());
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
+  // --- Effect to load the TTS model on startup ---
   useEffect(() => {
     async function loadModel() {
       try {
@@ -49,6 +46,7 @@ function App() {
     loadModel();
   }, []);
 
+  // --- Effect for PWA installation prompt ---
   useEffect(() => {
     const handleBeforeInstall = (e) => {
       e.preventDefault();
@@ -63,53 +61,42 @@ function App() {
     };
   }, []);
 
-  // ✅ CORRECT PLACEMENT: The new generateSpeech function
+  // --- ✅ FINAL SPEECH GENERATION & STREAMING PLAYBACK FUNCTION ---
   const generateSpeech = async () => {
     if (!tts || !text.trim()) return;
 
+    // Resume AudioContext if it was suspended by browser policy
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+
     setIsGenerating(true);
     setError(null);
-    setAudioUrl(null); // Clear previous audio
 
     try {
+      // 1. Split text into clean, non-empty sentences
       const sentences = split(text)
         .filter(node => node.type === 'Sentence')
-        .map(node => node.raw);
+        .map(node => node.raw.trim())
+        .filter(sentence => sentence.length > 0);
 
       if (sentences.length === 0) {
         throw new Error("No valid sentences found to process.");
       }
 
-      console.log(`Found ${sentences.length} sentences. Starting generation...`);
-      const audioChunks = [];
-      let sampleRate = 0;
+      console.log(`Found ${sentences.length} sentences. Starting parallel generation...`);
 
-      for (const sentence of sentences) {
-        const trimmedSentence = sentence.trim();
-        if (trimmedSentence) {
-          console.log(`Generating audio for: "${trimmedSentence}"`);
-          const result = await tts.generate(trimmedSentence, {
-            voice: selectedVoice
-          });
-          audioChunks.push(result.audio);
-          if (sampleRate === 0) {
-            sampleRate = result.sampling_rate;
-          }
-        }
-      }
+      // 2. Generate audio for all sentences in parallel for efficiency
+      const generationPromises = sentences.map(sentence => tts.generate(sentence, { voice: selectedVoice }));
+      const audioResults = await Promise.all(generationPromises);
 
-      const fullAudio = concatenateFloat32Arrays(audioChunks);
-      console.log("Audio generation complete. Total length:", fullAudio.length);
+      console.log("All sentences processed. Starting playback queue.");
+      
+      const sampleRate = audioResults.length > 0 ? audioResults[0].sampling_rate : 44100;
+      const audioChunks = audioResults.map(result => result.audio);
 
-      const buffer = audioContext.createBuffer(1, fullAudio.length, sampleRate);
-      buffer.copyToChannel(fullAudio, 0);
-
-      const wavBuffer = bufferToWav(buffer);
-      const blob = new Blob([wavBuffer], { type: 'audio/wav' });
-      const url = URL.createObjectURL(blob);
-
-      setAudioBuffer(buffer);
-      setAudioUrl(url);
+      // 3. Play the audio chunks back-to-back seamlessly
+      playQueue(audioChunks, sampleRate);
 
     } catch (error) {
       console.error("Speech generation failed:", error);
@@ -119,6 +106,25 @@ function App() {
     }
   };
 
+  // --- Helper function to play a queue of audio buffers ---
+  const playQueue = (audioChunks, sampleRate) => {
+    let nextPlayTime = audioContext.currentTime;
+
+    for (const chunk of audioChunks) {
+      const buffer = audioContext.createBuffer(1, chunk.length, sampleRate);
+      buffer.copyToChannel(chunk, 0);
+
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioContext.destination);
+      source.start(nextPlayTime);
+
+      // Schedule the next chunk to play right after the current one ends
+      nextPlayTime += buffer.duration;
+    }
+  };
+  
+  // --- Other helper functions ---
   const handleInstall = async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
@@ -126,70 +132,13 @@ function App() {
     if (outcome === 'accepted') setIsInstalled(true);
   };
 
-  // ✅ CORRECT PLACEMENT: All helper functions are inside the App component
-  const concatenateFloat32Arrays = (arrays) => {
-    let totalLength = 0;
-    for (const arr of arrays) {
-      totalLength += arr.length;
-    }
-    const result = new Float32Array(totalLength);
-    let offset = 0;
-    for (const arr of arrays) {
-      result.set(arr, offset);
-      offset += arr.length;
-    }
-    return result;
-  };
-
-  const bufferToWav = (audioBuffer) => {
-    const numOfChan = audioBuffer.numberOfChannels;
-    const length = audioBuffer.length * numOfChan * 2 + 44;
-    const buffer = new ArrayBuffer(length);
-    const view = new DataView(buffer);
-    const channels = [];
-    let offset = 0;
-    let pos = 0;
-
-    setUint32(view, pos + 0, 0x46464952);  // "RIFF"
-    setUint32(view, pos + 4, length - 8);  // file length
-    setUint32(view, pos + 8, 0x45564157);  // "WAVE"
-    setUint32(view, pos + 12, 0x20746d66); // "fmt " chunk
-    setUint32(view, pos + 16, 16);         // length = 16
-    setUint16(view, pos + 20, 1);          // PCM (uncompressed)
-    setUint16(view, pos + 22, numOfChan);
-    setUint32(view, pos + 24, audioBuffer.sampleRate);
-    setUint32(view, pos + 28, audioBuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
-    setUint16(view, pos + 32, numOfChan * 2); // block-align
-    setUint16(view, pos + 34, 16);         // 16-bit
-    setUint32(view, pos + 36, 0x61746164); // "data" - chunk
-    setUint32(view, pos + 40, length - pos - 44); // chunk length
-
-    pos += 44;
-    for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
-      channels.push(audioBuffer.getChannelData(i));
-    }
-
-    while (pos < length) {
-      for (let i = 0; i < numOfChan; i++) {
-        let sample = Math.max(-1, Math.min(1, channels[i][offset]));
-        sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
-        view.setInt16(pos, sample, true);
-        pos += 2;
-      }
-      offset++;
-    }
-    return buffer;
-  };
-
-  const setUint16 = (view, pos, val) => view.setUint16(pos, val, true);
-  const setUint32 = (view, pos, val) => view.setUint32(pos, val, true);
-
   const getVoiceName = (voice) => {
     const genderEmoji = voice.gender === 'female' ? '👩' : '🙎‍♂️';
     const countryFlag = voice.country ? ` 🇺🇸` : '';
     return `${voice.name.split(' ')[0]} ${genderEmoji}${countryFlag}`;
   };
 
+  // --- Render logic ---
   if (isLoading) {
     return (
       <div className="loading-screen">
@@ -199,7 +148,6 @@ function App() {
     );
   }
   
-  // ✅ The return statement with all your HTML (JSX)
   return (
     <div className="app-container">
       <div className="header">
@@ -229,18 +177,12 @@ function App() {
           {isGenerating ? <div className="loading-button">Generating...</div> : 'Generate Speech'}
         </button>
       </div>
-      {audioUrl && (
-        <div className="audio-player">
-          <audio
-            controls
-            src={audioUrl}
-            onError={(e) => console.error("Audio playback error:", e)}
-          />
-          <a href={audioUrl} download="generated_speech.wav">
-            Download Audio
-          </a>
-        </div>
-      )}
+
+      {/* ✅ UI update: Removed the old audio player and added a simple status message */}
+      <div className="status-message">
+        {isGenerating ? "Generating speech..." : (text.trim() && "Audio will play automatically.")}
+      </div>
+
       <div className="debug-info">
         <small>Model Status: {tts ? 'Loaded' : 'Not Loaded'}</small>
       </div>
